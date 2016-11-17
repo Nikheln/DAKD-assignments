@@ -1,0 +1,10 @@
+\documentclass{report}
+
+\usepackage[a4paper,margin=1in,landscape]{geometry}
+\usepackage{array}
+\usepackage{xcolor}
+
+\newcolumntype{P}[1]{>{\raggedleft\arraybackslash}b{#1}}
+\newcommand{\bftab}{\fontseries{b}\selectfont}
+
+\begin{document}

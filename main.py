@@ -136,21 +136,61 @@ def drawHistograms():
         plt.title(k)
         plt.savefig('histograms/' + k + '.pdf')
         plt.clf()
+
         
-def calculateCorrelationCoefficients(function):
-    """
-    Calculate the pairwise correlations of each array.
+##### Functionalities for correlation coefficient calculations #####
+class CCFormula(object):
+    def __init__(self, name):
+        self.name = name
     
-    @param data: The data to be calculated. A list of dicts where each dict is one item
+    def calculateCC():
+        raise NotImplementedError("Not implemented!")
+
+pearson = CCFormula('Pearson\'s correlation coefficient')
+def pearsonCC():
+    return {k1:{k2:stats.pearsonr([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
+pearson.calculateCC = pearsonCC
+
+spearman = CCFormula('Spearman\'s rho')
+def spearmanCC():
+    return {k1:{k2:stats.spearmanr([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
+spearman.calculateCC = spearmanCC
+
+kendall = CCFormula('Kendall\'s tau')
+def kendallCC():
+    return {k1:{k2:stats.kendalltau([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
+kendall.calculateCC = kendallCC
     
-    @param function: The function to be used. Possible values: 'pearson', 'spearman', 'kendall'
-    """
-    return {
-            'pearson':
-                [[stats.pearsonr([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys] for k1 in keys],
-            'spearman':
-                0,
-            'kendall':
-                0
-                }.get(function, 0)
+availableFunctions = [pearson, spearman, kendall]
     
+def correlationCoefficientsToLaTeX():
+    with open('temp.tex', 'w') as f:
+        with open("preamble") as pre:
+            f.writelines(pre.readlines())
+        
+        for function in availableFunctions:
+        
+            ccs = function.calculateCC()
+            f.write("\\section{Correlation coefficients using " + function.name + "}\n")
+            f.write("\\begin{tabular}{l || *{12}{P{1.2cm}}}\n")
+            
+            f.write("& " + " & ".join(keys))
+            f.write("\\\\\n\\hline ")
+            for k1 in keys:
+                f.write("\n" + k1 + " & ")
+                strs = []
+                for k2 in keys:
+                    value = ccs[k1][k2]
+                    if (abs(value) > 0.5):
+                        strs.append("\\bftab " + ("%.4f" % value))
+                    else:
+                        strs.append("%.4f" % value)
+                    
+                f.write(" & ".join(strs))
+                f.write(" \\\\\n")
+            f.write("\\end{tabular}\n\n")
+        
+        
+        f.write("\\end{document}")
+        f.flush()
+        f.close()
