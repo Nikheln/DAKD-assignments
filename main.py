@@ -9,9 +9,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
+import scipy as sc
 import itertools
 import math
 import scipy.constants as mconsts
+import scipy.stats as stats
 
 rows = []
 keys = []
@@ -33,6 +35,7 @@ def init():
               'legend.fontsize': 8, # was 10
               'xtick.labelsize': 8,
               'ytick.labelsize': 8,
+              'axes.linewidth': 0.5,
               'lines.linewidth': 0.3,
               'text.usetex': True,
               'figure.figsize': [figwidth, math.sqrt(2)*figwidth],
@@ -89,14 +92,40 @@ def drawBoxPlots():
         sp.set_title(k)
     plt.savefig('boxplots.pdf')
 
-def drawSingleHistograms():
+def calculateBinAmount(data, function):
+    """
+    Calculate the amount of bins that should be used for a histogram of the given data.
+    
+    @param data: The data to analyze as a list of numbers
+    
+    @param function: The function to be used. Possible values: 'sturges', 'scott', 'sqrt', 'freedman-diaconis'
+    
+    @return: The amount of bins to be used as a number
+    """
+    def hToK(data, h):
+        # Convert a given bin width to bin amount
+        return math.ceil((max(data) - min(data))/h)
+    return {
+            'sturges':
+                math.ceil(math.log2(len(data))+1),
+            'scott':
+                hToK(data, (3.5*np.std(data))/math.pow(len(data), 1/3)),
+            'sqrt':
+                int(math.sqrt(len(data))),
+            'freedman-diaconis':
+                hToK(data, (2*np.subtract(*np.percentile(data, [75, 25]))/math.pow(len(data), 1/3)))
+            }.get(function, 10)
+
+def drawSingleHistograms(function):
     ncols = 3
     fig, axes = plt.subplots(nrows=4, ncols=ncols)
     fig.subplots_adjust(hspace=0.3, wspace=0.3)
     for i, k in enumerate(keys):
         data = [r[k] for r in rows]
         sp = axes[int(i/ncols), i%ncols]
-        sp.hist(data, min(20, max(max(data)-min(data),len(set(data)))))
+        print(np.percentile(data, [75, 25]), math.pow(len(data), 1/3))
+        print(calculateBinAmount(data, function), len(data))
+        sp.hist(data, calculateBinAmount(data, function), linewidth=0.5)
         sp.set_title(k)
     plt.savefig('histograms.pdf')
     
@@ -107,3 +136,21 @@ def drawHistograms():
         plt.title(k)
         plt.savefig('histograms/' + k + '.pdf')
         plt.clf()
+        
+def calculateCorrelationCoefficients(function):
+    """
+    Calculate the pairwise correlations of each array.
+    
+    @param data: The data to be calculated. A list of dicts where each dict is one item
+    
+    @param function: The function to be used. Possible values: 'pearson', 'spearman', 'kendall'
+    """
+    return {
+            'pearson':
+                [[stats.pearsonr([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys] for k1 in keys],
+            'spearman':
+                0,
+            'kendall':
+                0
+                }.get(function, 0)
+    
