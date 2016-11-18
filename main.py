@@ -27,7 +27,8 @@ def init():
             dict[k] = float(v)
     keys.extend(list(rows[0].keys()))
     
-    figwidth = 6.9
+    figwidth = 10.2
+    figheight = 2
     params = {'backend': 'ps',
               'axes.labelsize': 8, # fontsize for x and y labels (was 10)
               'axes.titlesize': 8,
@@ -38,7 +39,7 @@ def init():
               'axes.linewidth': 0.5,
               'lines.linewidth': 0.3,
               'text.usetex': True,
-              'figure.figsize': [figwidth, math.sqrt(2)*figwidth],
+              'figure.figsize': [figwidth, figheight],
               'font.family': 'serif'
     }
     matplotlib.rcParams.update(params)
@@ -92,51 +93,71 @@ def drawBoxPlots():
         sp.set_title(k)
     plt.savefig('boxplots.pdf')
 
-def calculateBinAmount(data, function):
-    """
-    Calculate the amount of bins that should be used for a histogram of the given data.
+##### Functionalities for drawing histograms #####
+class BinAmountFormula(object):
+    def __init__(self, name, code):
+        self.name = name
+        self.code = code
     
-    @param data: The data to analyze as a list of numbers
-    
-    @param function: The function to be used. Possible values: 'sturges', 'scott', 'sqrt', 'freedman-diaconis'
-    
-    @return: The amount of bins to be used as a number
-    """
-    def hToK(data, h):
-        # Convert a given bin width to bin amount
-        return math.ceil((max(data) - min(data))/h)
-    return {
-            'sturges':
-                math.ceil(math.log2(len(data))+1),
-            'scott':
-                hToK(data, (3.5*np.std(data))/math.pow(len(data), 1/3)),
-            'sqrt':
-                int(math.sqrt(len(data))),
-            'freedman-diaconis':
-                hToK(data, (2*np.subtract(*np.percentile(data, [75, 25]))/math.pow(len(data), 1/3)))
-            }.get(function, 10)
+    def calculateBinAmount(data):
+        raise NotImplementedError("Not implemented!")
 
-def drawSingleHistograms(function):
-    ncols = 3
-    fig, axes = plt.subplots(nrows=4, ncols=ncols)
+def hToK(data, h):
+    # Convert a given bin width to bin amount
+    return math.ceil((max(data) - min(data))/h)
+        
+sturges = BinAmountFormula("Sturges\' rule", "sturges")
+def sturgesFormula(data):
+    return math.ceil(math.log2(len(data))+1)
+sturges.calculateBinAmount = sturgesFormula
+
+scott = BinAmountFormula("Scott\'s rule", "scott")
+def scottFormula(data):
+    return hToK(data, (3.5*np.std(data))/len(data)**(1/3))
+scott.calculateBinAmount = scottFormula
+
+sqrtformula = BinAmountFormula("Square-root choice", "sqrt")
+def sqrtFormula(data):
+    return int(math.sqrt(len(data)))
+sqrtformula.calculateBinAmount = sqrtFormula
+
+fd = BinAmountFormula("Freedman-Diaconis\' choice", "freedman-diaconis")
+def fdFormula(data):
+    return hToK(data, (2*np.subtract(*np.percentile(data, [75, 25]))/math.pow(len(data), 1/3)))
+fd.calculateBinAmount = fdFormula
+
+binAmountFunctions = [sturges, scott, sqrtformula, fd]
+
+def drawSingleHistograms(function, ncols, nrows):
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols)
     fig.subplots_adjust(hspace=0.3, wspace=0.3)
     for i, k in enumerate(keys):
         data = [r[k] for r in rows]
+        binAmount = function.calculateBinAmount(data)
         sp = axes[int(i/ncols), i%ncols]
-        print(np.percentile(data, [75, 25]), math.pow(len(data), 1/3))
-        print(calculateBinAmount(data, function), len(data))
-        sp.hist(data, calculateBinAmount(data, function), linewidth=0.5)
+        sp.hist(data, bins=binAmount, linewidth=0.5)
         sp.set_title(k)
-    plt.savefig('histograms.pdf')
+    plt.savefig('histograms/histograms_' + function.code + '.pdf', bbox_inches="tight")
     
-def drawHistograms():
-    for k in keys:
-        data = [r[k] for r in rows]
-        plt.hist(data, min(20, max(max(data)-min(data),len(set(data)))))
-        plt.title(k)
-        plt.savefig('histograms/' + k + '.pdf')
-        plt.clf()
+def drawAttributeHistograms(key):
+    fig, axes = plt.subplots(nrows=1, ncols=len(binAmountFunctions))
+    fig.subplots_adjust(hspace=0.3, wspace=0.3)
+    data = [r[key] for r in rows]
+    
+    for index, function in enumerate(binAmountFunctions):
+        sp = axes[index]
+        sp.hist(data, function.calculateBinAmount(data))
+        sp.set_title(function.name)
+    plt.savefig('histograms/' + key.replace(" ", "_") + '.pdf')
 
+def histogramsToLaTeX(f):
+    f.write("\\section{Histograms of attributes using different binning functions}\n\n")
+    
+    for key in keys:
+        drawAttributeHistograms(key)
+        
+        f.write("\\subsection{" + key + "}\n")
+        f.write("\\includegraphics{histograms/" + key.replace(" ", "_") + ".pdf}\n\n")
         
 ##### Functionalities for correlation coefficient calculations #####
 class CCFormula(object):
@@ -161,35 +182,41 @@ def kendallCC():
     return {k1:{k2:stats.kendalltau([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
 kendall.calculateCC = kendallCC
     
-availableFunctions = [pearson, spearman, kendall]
+correlationCoefficientFunctions = [pearson, spearman, kendall]
     
-def correlationCoefficientsToLaTeX():
+def correlationCoefficientsToLaTeX(f):
+    f.write("\\section{Correlation coefficients using different functions}\n\n")
+    
+    for function in correlationCoefficientFunctions:
+    
+        ccs = function.calculateCC()
+        f.write("\\subsection{Correlation coefficients using " + function.name + "}\n")
+        f.write("\\begin{tabular}{l || *{12}{P{1.2cm}}}\n")
+        
+        f.write("& " + " & ".join(keys))
+        f.write("\\\\\n\\hline ")
+        for k1 in keys:
+            f.write("\n" + k1 + " & ")
+            strs = []
+            for k2 in keys:
+                value = ccs[k1][k2]
+                if (abs(value) > 0.5):
+                    strs.append("\\bftab " + ("%.4f" % value))
+                else:
+                    strs.append("%.4f" % value)
+                
+            f.write(" & ".join(strs))
+            f.write(" \\\\\n")
+        f.write("\\end{tabular}\n\n")
+    
+        
+def LaTeXifyProjct():
     with open('temp.tex', 'w') as f:
         with open("preamble") as pre:
             f.writelines(pre.readlines())
-        
-        for function in availableFunctions:
-        
-            ccs = function.calculateCC()
-            f.write("\\section{Correlation coefficients using " + function.name + "}\n")
-            f.write("\\begin{tabular}{l || *{12}{P{1.2cm}}}\n")
-            
-            f.write("& " + " & ".join(keys))
-            f.write("\\\\\n\\hline ")
-            for k1 in keys:
-                f.write("\n" + k1 + " & ")
-                strs = []
-                for k2 in keys:
-                    value = ccs[k1][k2]
-                    if (abs(value) > 0.5):
-                        strs.append("\\bftab " + ("%.4f" % value))
-                    else:
-                        strs.append("%.4f" % value)
-                    
-                f.write(" & ".join(strs))
-                f.write(" \\\\\n")
-            f.write("\\end{tabular}\n\n")
-        
+    
+        histogramsToLaTeX(f)
+        correlationCoefficientsToLaTeX(f)
         
         f.write("\\end{document}")
         f.flush()

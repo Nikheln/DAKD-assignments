@@ -3,6 +3,7 @@
 \usepackage[a4paper,margin=1in,landscape]{geometry}
 \usepackage{array}
 \usepackage{xcolor}
+\usepackage{graphicx}
 
 \newcolumntype{P}[1]{>{\raggedleft\arraybackslash}b{#1}}
 \newcommand{\bftab}{\fontseries{b}\selectfont}
