@@ -2,17 +2,14 @@
 """
 Created on Thu Nov 10 18:56:53 2016
 
-@author: Niko
+@author: nipehe
 """
 import csv
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 import numpy as np
-import scipy as sc
 import itertools
 import math
-import scipy.constants as mconsts
 import scipy.stats as stats
 
 rows = []
@@ -27,7 +24,7 @@ def init():
             dict[k] = float(v)
     keys.extend(list(rows[0].keys()))
     
-    figwidth = 10.2
+    figwidth = 10
     figheight = 2
     params = {'backend': 'ps',
               'axes.labelsize': 8, # fontsize for x and y labels (was 10)
@@ -37,7 +34,13 @@ def init():
               'xtick.labelsize': 8,
               'ytick.labelsize': 8,
               'axes.linewidth': 0.5,
-              'lines.linewidth': 0.3,
+              'boxplot.boxprops.linewidth': 0.5,
+              'boxplot.medianprops.linewidth': 0.5,
+              'boxplot.meanprops.linewidth': 0.5,
+              'boxplot.flierprops.linewidth': 0.5,
+              'boxplot.whiskerprops.linewidth': 0.5,
+              'boxplot.capprops.linewidth': 0.5,
+              'lines.linewidth': 0.5,
               'text.usetex': True,
               'figure.figsize': [figwidth, figheight],
               'font.family': 'serif'
@@ -84,15 +87,28 @@ def drawScatterMatrix():
         axes[i,j].yaxis.set_visible(True)
 
 def drawBoxPlots():
-    ncols = 3
-    fig, axes = plt.subplots(nrows=4, ncols=ncols)
+    ncols = 4
+    nrows = 3
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 7))
     fig.subplots_adjust(hspace=0.3, wspace=0.3)
     for i, k in enumerate(keys):
         sp = axes[int(i/ncols), i%ncols]
         sp.boxplot([r[k] for r in rows], flierprops={'marker':'o', 'markerfacecolor':'none', 'markersize':'2', 'linewidth':'0.5'})
         sp.set_title(k)
-    plt.savefig('boxplots.pdf')
+        sp.xaxis.set_ticklabels([''])
+    plt.savefig('boxplots.pdf', bbox_inches='tight')
+    
+def drawAttributeBoxplot(key):
+    data = [r[key] for r in rows]
+    plt.clf()
+    plt.boxplot(data, vert=False,flierprops={'marker':'o', 'markerfacecolor':'none', 'markersize':'2', 'linewidth':'0.5'})
+    plt.savefig('boxplots/' + key.replace(" ", "_") + ".pdf", bbox_inches='tight')
 
+def boxplotToLaTeX(key, f):
+    drawAttributeBoxplot(key)
+    
+    f.write("\\includegraphics{boxplots/" + key.replace(" ", "_") + ".pdf}[H]\n")
+    
 ##### Functionalities for drawing histograms #####
 class BinAmountFormula(object):
     def __init__(self, name, code):
@@ -140,6 +156,7 @@ def drawSingleHistograms(function, ncols, nrows):
     plt.savefig('histograms/histograms_' + function.code + '.pdf', bbox_inches="tight")
     
 def drawAttributeHistograms(key):
+    plt.clf()
     fig, axes = plt.subplots(nrows=1, ncols=len(binAmountFunctions))
     fig.subplots_adjust(hspace=0.3, wspace=0.3)
     data = [r[key] for r in rows]
@@ -150,14 +167,10 @@ def drawAttributeHistograms(key):
         sp.set_title(function.name)
     plt.savefig('histograms/' + key.replace(" ", "_") + '.pdf')
 
-def histogramsToLaTeX(f):
-    f.write("\\section{Histograms of attributes using different binning functions}\n\n")
+def histogramsToLaTeX(key, f):
+    drawAttributeHistograms(key)
     
-    for key in keys:
-        drawAttributeHistograms(key)
-        
-        f.write("\\subsection{" + key + "}\n")
-        f.write("\\includegraphics{histograms/" + key.replace(" ", "_") + ".pdf}\n\n")
+    f.write("\\includegraphics{histograms/" + key.replace(" ", "_") + ".pdf}[H]\n")
         
 ##### Functionalities for correlation coefficient calculations #####
 class CCFormula(object):
@@ -214,8 +227,13 @@ def LaTeXifyProjct():
     with open('temp.tex', 'w') as f:
         with open("preamble") as pre:
             f.writelines(pre.readlines())
-    
-        histogramsToLaTeX(f)
+        
+        f.write("\\section{Plots of single attributes}\n\n")
+        for key in keys:
+            f.write("\\subsection{" + key + "}\n")
+            histogramsToLaTeX(key, f)
+            boxplotToLaTeX(key, f)
+            
         correlationCoefficientsToLaTeX(f)
         
         f.write("\\end{document}")

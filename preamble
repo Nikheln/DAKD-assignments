@@ -4,6 +4,7 @@
 \usepackage{array}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{float}
 
 \newcolumntype{P}[1]{>{\raggedleft\arraybackslash}b{#1}}
 \newcommand{\bftab}{\fontseries{b}\selectfont}
