@@ -1,6 +1,6 @@
 \documentclass{report}
 
-\usepackage[a4paper,margin=1in,landscape]{geometry}
+\usepackage[a4paper,margin=0.5in]{geometry}
 \usepackage{array}
 \usepackage{xcolor}
 \usepackage{graphicx}

@@ -11,9 +11,13 @@ import numpy as np
 import itertools
 import math
 import scipy.stats as stats
+import subprocess
+import os
 
 rows = []
 keys = []
+replot = False
+genPdf = True
 
 def init():
     with open('winequality-white.csv') as csvfile:
@@ -24,8 +28,8 @@ def init():
             dict[k] = float(v)
     keys.extend(list(rows[0].keys()))
     
-    figwidth = 10
-    figheight = 2
+    figwidth = 7.3
+    figheight = 3
     params = {'backend': 'ps',
               'axes.labelsize': 8, # fontsize for x and y labels (was 10)
               'axes.titlesize': 8,
@@ -42,7 +46,7 @@ def init():
               'boxplot.capprops.linewidth': 0.5,
               'lines.linewidth': 0.5,
               'text.usetex': True,
-              'figure.figsize': [figwidth, figheight],
+              #'figure.figsize': [figwidth, figheight],
               'font.family': 'serif'
     }
     matplotlib.rcParams.update(params)
@@ -104,11 +108,6 @@ def drawAttributeBoxplot(key):
     plt.boxplot(data, vert=False,flierprops={'marker':'o', 'markerfacecolor':'none', 'markersize':'2', 'linewidth':'0.5'})
     plt.savefig('boxplots/' + key.replace(" ", "_") + ".pdf", bbox_inches='tight')
 
-def boxplotToLaTeX(key, f):
-    drawAttributeBoxplot(key)
-    
-    f.write("\\includegraphics{boxplots/" + key.replace(" ", "_") + ".pdf}[H]\n")
-    
 ##### Functionalities for drawing histograms #####
 class BinAmountFormula(object):
     def __init__(self, name, code):
@@ -155,23 +154,24 @@ def drawSingleHistograms(function, ncols, nrows):
         sp.set_title(k)
     plt.savefig('histograms/histograms_' + function.code + '.pdf', bbox_inches="tight")
     
-def drawAttributeHistograms(key):
+def drawAttributeHistograms(key, **kwargs):
     plt.clf()
     fig, axes = plt.subplots(nrows=1, ncols=len(binAmountFunctions))
     fig.subplots_adjust(hspace=0.3, wspace=0.3)
     data = [r[key] for r in rows]
+    if kwargs.get('filterOutliers', False):
+        data = [x for x in data if abs(x - np.mean(data)) < kwargs.get('filterLimit', 3) * np.std(data)]
     
     for index, function in enumerate(binAmountFunctions):
         sp = axes[index]
         sp.hist(data, function.calculateBinAmount(data))
         sp.set_title(function.name)
-    plt.savefig('histograms/' + key.replace(" ", "_") + '.pdf')
-
-def histogramsToLaTeX(key, f):
-    drawAttributeHistograms(key)
     
-    f.write("\\includegraphics{histograms/" + key.replace(" ", "_") + ".pdf}[H]\n")
-        
+    if kwargs.get('filterOutliers', False):
+        plt.savefig('histograms/' + key.replace(" ", "_") + '_filtered.pdf')
+    else:
+        plt.savefig('histograms/' + key.replace(" ", "_") + '.pdf')
+
 ##### Functionalities for correlation coefficient calculations #####
 class CCFormula(object):
     def __init__(self, name):
@@ -222,9 +222,38 @@ def correlationCoefficientsToLaTeX(f):
             f.write(" \\\\\n")
         f.write("\\end{tabular}\n\n")
     
+
+def boxplotToLaTeX(key, f):
+    if replot:
+        drawAttributeBoxplot(key)
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{boxplots/" + key.replace(" ", "_") + ".pdf}\n")
+    f.write("\\caption{Boxplot of attribute \\emph{" + key + "}}")
+    f.write("\\end{figure}\n\n")
+
+    
+def histogramsToLaTeX(key, f):
+    if replot:
+        drawAttributeHistograms(key)
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{histograms/" + key.replace(" ", "_") + ".pdf}\n")
+    f.write("\\caption{Histograms of attribute \\emph{" + key + "} using different binning methods}")
+    f.write("\\end{figure}\n\n")
+
+def outlierFilteredHistogramsToLaTeX(key, f):
+    if replot:
+        drawAttributeHistograms(key, filterOutliers=True)
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{histograms/" + key.replace(" ", "_") + "_filtered.pdf}\n")
+    f.write("\\caption{Histograms of attribute \\emph{" + key + "} with outliers further than 3 standard deviations from the mean filtered}\\n")
+    f.write("\\end{figure}\n\n")
         
 def LaTeXifyProjct():
-    with open('temp.tex', 'w') as f:
+    filename = 'temp'
+    with open(filename+'.tex', 'w') as f:
         with open("preamble") as pre:
             f.writelines(pre.readlines())
         
@@ -232,10 +261,19 @@ def LaTeXifyProjct():
         for key in keys:
             f.write("\\subsection{" + key + "}\n")
             histogramsToLaTeX(key, f)
+            outlierFilteredHistogramsToLaTeX(key, f)
             boxplotToLaTeX(key, f)
+            f.write("\\newpage")
             
         correlationCoefficientsToLaTeX(f)
         
         f.write("\\end{document}")
         f.flush()
         f.close()
+    
+    if genPdf:
+        cmd = ['pdflatex', '-interaction', 'nonstopmode', '-output-directory', 'build/', filename+'.tex']
+        proc = subprocess.Popen(cmd)
+        proc.communicate()
+        
+        os.startfile('build\\'+filename+'.pdf')
