@@ -8,7 +8,6 @@ import csv
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import itertools
 import math
 import scipy.stats as stats
 import subprocess
@@ -28,8 +27,6 @@ def init():
             dict[k] = float(v)
     keys.extend(list(rows[0].keys()))
     
-    figwidth = 7.3
-    figheight = 3
     params = {'backend': 'ps',
               'axes.labelsize': 8, # fontsize for x and y labels (was 10)
               'axes.titlesize': 8,
@@ -46,7 +43,6 @@ def init():
               'boxplot.capprops.linewidth': 0.5,
               'lines.linewidth': 0.5,
               'text.usetex': True,
-              #'figure.figsize': [figwidth, figheight],
               'font.family': 'serif'
     }
     matplotlib.rcParams.update(params)
@@ -57,8 +53,7 @@ init()
 #plt.show()
 
 def drawScatterMatrix():
-    plotwidth = 30
-    #keys.remove('quality')
+    plotwidth = 15
     fig, axes = plt.subplots(nrows=len(keys), ncols=len(keys), figsize=(plotwidth, plotwidth))
     fig.subplots_adjust(hspace=0.05, wspace=0.05)
     
@@ -66,30 +61,42 @@ def drawScatterMatrix():
         ax.xaxis.set_visible(False)
         ax.yaxis.set_visible(False)
         
-        if ax.is_first_col():
-            ax.yaxis.set_ticks_position('left')
-        if ax.is_last_col():
-            ax.yaxis.set_ticks_position('right')
-        if ax.is_first_row():
-            ax.xaxis.set_ticks_position('top')
-        if ax.is_last_row():
-            ax.xaxis.set_ticks_position('bottom')
-        
     for i, j in zip(*np.triu_indices_from(axes, k=1)):
         for x, y in [(i,j), (j,i)]:
-            axes[x,y].scatter([d[keys[x]] for d in rows], [d[keys[y]] for d in rows], marker='o', c=[d['quality'] for d in rows])
+            axes[x,y].scatter([d[keys[x]] for d in rows], [d[keys[y]] for d in rows], marker='o', s=1)
             
     
     # Label the diagonal subplots...
     for i, label in enumerate(keys):
-        axes[i,i].annotate(label, (0.5, 0.5), xycoords='axes fraction',
+        axes[i,i].annotate(label.replace(" ", "\n"), (0.5, 0.5), size=15, xycoords='axes fraction',
                 ha='center', va='center')
     
-    # Turn on the proper x or y axes ticks.
-    for i, j in zip(range(len(keys)), itertools.cycle((-1, 0))):
-        axes[j,i].xaxis.set_visible(True)
-        axes[i,j].yaxis.set_visible(True)
+    plt.savefig('scattermatrix.pdf', bbox_inches='tight')
 
+def drawParallelPlot(key):
+    dims = len(keys)
+    fig, axes = plt.subplots(1, dims, sharey=False)
+    plt.subplots_adjust(wspace=0)
+    cm = plt.cm.jet
+    
+    for i, axis in enumerate(axes.flat):
+        axis.xaxis.set_visible(False)
+        axis.yaxis.set_ticks_position('none')
+        plt.setp(axis.get_yticklabels(), visible=False)
+        axis.set_title(keys[i].replace(" ", "\n"), x=0)
+        if i+1 < dims:
+            coloring = [r[key] for r in rows]
+            coloring = [(i-min(coloring))/(max(coloring)-min(coloring)) for i in coloring]
+            rside = [r[keys[i]] for r in rows]
+            rside = [(i-min(rside))/(max(rside)-min(rside)) for i in rside]
+            lside = [r[keys[i+1]] for r in rows]
+            lside = [(i-min(lside))/(max(lside)-min(lside)) for i in lside]
+            for i in range(len(rside)):
+                axis.plot([1,0],[lside[i], rside[i]], color=cm(coloring[i]))
+    plt.savefig('parallel_coords.pdf', bbox_inches='tight')
+    plt.clf()
+    
+    
 def drawBoxPlots():
     ncols = 4
     nrows = 3
@@ -204,6 +211,7 @@ def correlationCoefficientsToLaTeX(f):
     
         ccs = function.calculateCC()
         f.write("\\subsection{Correlation coefficients using " + function.name + "}\n")
+        f.write("\\begin{adjustbox}{max width=\\textwidth}\n")
         f.write("\\begin{tabular}{l || *{12}{P{1.2cm}}}\n")
         
         f.write("& " + " & ".join(keys))
@@ -213,16 +221,30 @@ def correlationCoefficientsToLaTeX(f):
             strs = []
             for k2 in keys:
                 value = ccs[k1][k2]
-                if (abs(value) > 0.5):
-                    strs.append("\\bftab " + ("%.4f" % value))
-                else:
+                if (value < -0.5):
+                    strs.append("\\bftab -" + ("%.4f" % value))
+                elif (value < 0):
+                    strs.append("-" + ("%.4f" % value))
+                elif (value < 0.5):
                     strs.append("%.4f" % value)
-                
+                else:
+                    strs.append("\\bftab " + ("%.4f" % value))
+                    
             f.write(" & ".join(strs))
             f.write(" \\\\\n")
-        f.write("\\end{tabular}\n\n")
+        f.write("\\end{tabular}\n")
+        f.write("\\end{adjustbox}\n")
     
 
+def histogramsToLaTeX(key, f):
+    if replot:
+        drawAttributeHistograms(key)
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{histograms/" + key.replace(" ", "_") + ".pdf}\n")
+    f.write("\\caption{Histograms of attribute \\emph{" + key + "} using different binning methods}")
+    f.write("\\end{figure}\n\n")
+    
 def boxplotToLaTeX(key, f):
     if replot:
         drawAttributeBoxplot(key)
@@ -232,16 +254,24 @@ def boxplotToLaTeX(key, f):
     f.write("\\caption{Boxplot of attribute \\emph{" + key + "}}")
     f.write("\\end{figure}\n\n")
 
-    
-def histogramsToLaTeX(key, f):
+def scatterMatrixToLaTeX(f):
     if replot:
-        drawAttributeHistograms(key)
+        drawScatterMatrix()
     
     f.write("\\begin{figure}[H]\n")
-    f.write("\\includegraphics[width=\\textwidth]{histograms/" + key.replace(" ", "_") + ".pdf}\n")
-    f.write("\\caption{Histograms of attribute \\emph{" + key + "} using different binning methods}")
+    f.write("\\includegraphics[width=\\textwidth]{scattermatrix.pdf}\n")
+    f.write("\\caption{Scatter matrix of the whole feature set}\\n")
     f.write("\\end{figure}\n\n")
 
+def parallelPlotToLaTeX(f):
+    if replot:
+        drawParallelPlot()
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{parallelcoords.pdf}\n")
+    f.write("\\caption{Parallel coordinates representation of the data set}\\n")
+    f.write("\\end{figure}\n\n")
+    
 def outlierFilteredHistogramsToLaTeX(key, f):
     if replot:
         drawAttributeHistograms(key, filterOutliers=True)
@@ -264,7 +294,11 @@ def LaTeXifyProjct():
             outlierFilteredHistogramsToLaTeX(key, f)
             boxplotToLaTeX(key, f)
             f.write("\\newpage")
-            
+        
+        
+        f.write("\\section{Plots for the whole feature set}\n\n")
+        scatterMatrixToLaTeX(f)
+        
         correlationCoefficientsToLaTeX(f)
         
         f.write("\\end{document}")
