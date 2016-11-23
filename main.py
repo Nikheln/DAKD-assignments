@@ -12,6 +12,9 @@ import math
 import scipy.stats as stats
 import subprocess
 import os
+from sklearn import manifold
+from sklearn.metrics import euclidean_distances
+from sklearn.decomposition import PCA
 
 rows = []
 keys = []
@@ -52,7 +55,7 @@ init()
 #plt.plot([d['quality'] for d in rows], [d['sulphates'] for d in rows], 'ro')
 #plt.show()
 
-def drawScatterMatrix():
+def drawScatterMatrix(**kwargs):
     plotwidth = 15
     fig, axes = plt.subplots(nrows=len(keys), ncols=len(keys), figsize=(plotwidth, plotwidth))
     fig.subplots_adjust(hspace=0.05, wspace=0.05)
@@ -60,10 +63,23 @@ def drawScatterMatrix():
     for ax in axes.flat:
         ax.xaxis.set_visible(False)
         ax.yaxis.set_visible(False)
-        
+    
+    filtering = kwargs.get('filterOutliers', False)
+    means = {}
+    stds = {}
+    for i, key in enumerate(keys):
+        data = [r[key] for r in rows]
+        means[key] = np.mean(data)
+        stds[key] = np.std(data)
+    filterDistance = kwargs.get('filterLimit', 3)
+    def included(value, key):
+        return not filtering or abs(value - means[key]) < filterDistance * stds[key]
     for i, j in zip(*np.triu_indices_from(axes, k=1)):
         for x, y in [(i,j), (j,i)]:
-            axes[x,y].scatter([d[keys[x]] for d in rows], [d[keys[y]] for d in rows], marker='o', s=1)
+            dataX = [d[keys[x]] for d in rows if included(d[keys[x]], keys[x]) and included(d[keys[y]], keys[y])]
+            dataY = [d[keys[y]] for d in rows if included(d[keys[x]], keys[x]) and included(d[keys[y]], keys[y])]
+            
+            axes[x,y].scatter(dataX, dataY, marker='o', s=1)
             
     
     # Label the diagonal subplots...
@@ -71,29 +87,37 @@ def drawScatterMatrix():
         axes[i,i].annotate(label.replace(" ", "\n"), (0.5, 0.5), size=15, xycoords='axes fraction',
                 ha='center', va='center')
     
-    plt.savefig('scattermatrix.pdf', bbox_inches='tight')
+    if filtering:
+        plt.savefig('scattermatrix_filtered.png', bbox_inches='tight', dpi=300)
+    else:
+        plt.savefig('scattermatrix.png', bbox_inches='tight', dpi=300)
 
 def drawParallelPlot(key):
     dims = len(keys)
     fig, axes = plt.subplots(1, dims, sharey=False)
     plt.subplots_adjust(wspace=0)
-    cm = plt.cm.jet
+    
+    # Move the key used for coloring to the last position
+    keylist = [k for k in keys if k != key]
+    keylist.append(key)
+    
+    # Create the list of colors used for lines
+    coloring = [r[key] for r in rows]
+    coloring = [(i-min(coloring))/(max(coloring)-min(coloring)) for i in coloring]
     
     for i, axis in enumerate(axes.flat):
         axis.xaxis.set_visible(False)
         axis.yaxis.set_ticks_position('none')
         plt.setp(axis.get_yticklabels(), visible=False)
-        axis.set_title(keys[i].replace(" ", "\n"), x=0)
+        axis.set_title(keylist[i].replace(" ", "\n"), x=0)
         if i+1 < dims:
-            coloring = [r[key] for r in rows]
-            coloring = [(i-min(coloring))/(max(coloring)-min(coloring)) for i in coloring]
-            rside = [r[keys[i]] for r in rows]
+            rside = [r[keylist[i]] for r in rows]
             rside = [(i-min(rside))/(max(rside)-min(rside)) for i in rside]
-            lside = [r[keys[i+1]] for r in rows]
+            lside = [r[keylist[i+1]] for r in rows]
             lside = [(i-min(lside))/(max(lside)-min(lside)) for i in lside]
             for i in range(len(rside)):
-                axis.plot([1,0],[lside[i], rside[i]], color=cm(coloring[i]))
-    plt.savefig('parallel_coords.pdf', bbox_inches='tight')
+                axis.plot([1,0],[lside[i], rside[i]], color=plt.cm.jet(coloring[i]))
+    plt.savefig('parallel_coords.png', bbox_inches='tight', dpi=300)
     plt.clf()
     
     
@@ -203,7 +227,61 @@ def kendallCC():
 kendall.calculateCC = kendallCC
     
 correlationCoefficientFunctions = [pearson, spearman, kendall]
+
+##### Principal component analysis #####
+w=len(rows)
+h=len(keys)
+
+def getMeanVector():
+    X = np.matrix([[r[k] for r in rows] for k in keys])
+    return np.array([np.mean(X[i,:]) for i in range(h)]).reshape(h,1)
+
+def getStandardizedData():
+    X = np.matrix([[r[k] for r in rows] for k in keys])
+    mean_vector = getMeanVector()
+    std_vector = np.array([np.std(X[i,:]) for i in range(h)]).reshape(h,1)
     
+    # Z-score standardization
+    for i in range(h):
+        for j in range(w):
+            X[i,j] = (X[i,j]-mean_vector[i])/std_vector[i]
+    
+    return X
+    
+def principalComponentAnalysis(dimensions):
+    
+    X = getStandardizedData()
+    mean_vector = getMeanVector()
+    
+    cov_matrix = np.zeros((h, h))
+    for i in range(w):
+        x = X[:,i].reshape(h,1)
+        cov_matrix += (x - mean_vector).dot((x - mean_vector).T)
+    cov_matrix[:,:] /= (w-1)
+    
+    eig_val_sc, eig_vec_sc = np.linalg.eig(cov_matrix)
+    
+    # Pair up eigenvalues and the corresponding eigenvectors
+    eig_pairs = [(np.abs(eig_val_sc[i]), eig_vec_sc[:,i]) for i in range(h)]
+    
+    # Sort to decreasing order of eigenvalue
+    eig_pairs.sort(key=lambda x: x[0], reverse=True)
+    transformation_matrix = np.matrix([ep[1] for ep in eig_pairs[0:dimensions]]).T
+    
+    return transformation_matrix
+
+def PCAplot():
+    tm = principalComponentAnalysis(2)
+    data = getStandardizedData()
+    
+    projected_data = tm.T.dot(data)
+    
+    filtered_data = [[projected_data[x,y] for y in range(len(rows))
+        if abs(projected_data[0,y]) < 6
+        and abs(projected_data[1,y] < 6)] for x in range(2)]
+    
+    plt.scatter(filtered_data[0], filtered_data[1])
+
 def correlationCoefficientsToLaTeX(f):
     f.write("\\section{Correlation coefficients using different functions}\n\n")
     
@@ -245,6 +323,15 @@ def histogramsToLaTeX(key, f):
     f.write("\\caption{Histograms of attribute \\emph{" + key + "} using different binning methods}")
     f.write("\\end{figure}\n\n")
     
+def outlierFilteredHistogramsToLaTeX(key, f):
+    if replot:
+        drawAttributeHistograms(key, filterOutliers=True)
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{histograms/" + key.replace(" ", "_") + "_filtered.pdf}\n")
+    f.write("\\caption{Histograms of attribute \\emph{" + key + "} with outliers further than 3 standard deviations from the mean filtered}\\n")
+    f.write("\\end{figure}\n\n")
+    
 def boxplotToLaTeX(key, f):
     if replot:
         drawAttributeBoxplot(key)
@@ -259,8 +346,17 @@ def scatterMatrixToLaTeX(f):
         drawScatterMatrix()
     
     f.write("\\begin{figure}[H]\n")
-    f.write("\\includegraphics[width=\\textwidth]{scattermatrix.pdf}\n")
+    f.write("\\includegraphics[width=\\textwidth]{scattermatrix.png}\n")
     f.write("\\caption{Scatter matrix of the whole feature set}\\n")
+    f.write("\\end{figure}\n\n")
+
+def outlierFilteredScatterMatrixToLaTeX(f):
+    if replot:
+        drawScatterMatrix(filterOutliers=True, filterLimit=3)
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{scattermatrix_filtered.png}\n")
+    f.write("\\caption{Scatter matrix of the whole feature set with outliers further than 3 standard deviations from the mean filtered}\\n")
     f.write("\\end{figure}\n\n")
 
 def parallelPlotToLaTeX(f):
@@ -268,18 +364,10 @@ def parallelPlotToLaTeX(f):
         drawParallelPlot()
     
     f.write("\\begin{figure}[H]\n")
-    f.write("\\includegraphics[width=\\textwidth]{parallelcoords.pdf}\n")
+    f.write("\\includegraphics[width=\\textwidth]{parallel_coords.png}\n")
     f.write("\\caption{Parallel coordinates representation of the data set}\\n")
     f.write("\\end{figure}\n\n")
     
-def outlierFilteredHistogramsToLaTeX(key, f):
-    if replot:
-        drawAttributeHistograms(key, filterOutliers=True)
-    
-    f.write("\\begin{figure}[H]\n")
-    f.write("\\includegraphics[width=\\textwidth]{histograms/" + key.replace(" ", "_") + "_filtered.pdf}\n")
-    f.write("\\caption{Histograms of attribute \\emph{" + key + "} with outliers further than 3 standard deviations from the mean filtered}\\n")
-    f.write("\\end{figure}\n\n")
         
 def LaTeXifyProjct():
     filename = 'temp'
@@ -298,6 +386,8 @@ def LaTeXifyProjct():
         
         f.write("\\section{Plots for the whole feature set}\n\n")
         scatterMatrixToLaTeX(f)
+        outlierFilteredScatterMatrixToLaTeX(f)
+        parallelPlotToLaTeX(f)
         
         correlationCoefficientsToLaTeX(f)
         
