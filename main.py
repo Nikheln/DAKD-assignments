@@ -12,9 +12,6 @@ import math
 import scipy.stats as stats
 import subprocess
 import os
-from sklearn import manifold
-from sklearn.metrics import euclidean_distances
-from sklearn.decomposition import PCA
 
 rows = []
 keys = []
@@ -117,6 +114,10 @@ def drawParallelPlot(key):
             lside = [(i-min(lside))/(max(lside)-min(lside)) for i in lside]
             for i in range(len(rside)):
                 axis.plot([1,0],[lside[i], rside[i]], color=plt.cm.jet(coloring[i]))
+        else:
+            # Requires testing!
+            for s in axis.spines:
+                s.set_visible(False)
     plt.savefig('parallel_coords.png', bbox_inches='tight', dpi=300)
     plt.clf()
     
@@ -251,7 +252,7 @@ def getStandardizedData():
 def principalComponentAnalysis(dimensions):
     
     X = getStandardizedData()
-    mean_vector = getMeanVector()
+    mean_vector = [np.mean(X[:,i]) for i in range(h)]
     
     cov_matrix = np.zeros((h, h))
     for i in range(w):
@@ -263,24 +264,40 @@ def principalComponentAnalysis(dimensions):
     
     # Pair up eigenvalues and the corresponding eigenvectors
     eig_pairs = [(np.abs(eig_val_sc[i]), eig_vec_sc[:,i]) for i in range(h)]
-    
     # Sort to decreasing order of eigenvalue
     eig_pairs.sort(key=lambda x: x[0], reverse=True)
     transformation_matrix = np.matrix([ep[1] for ep in eig_pairs[0:dimensions]]).T
     
-    return transformation_matrix
+    var_proportions = [ep[0] for ep in eig_pairs]
+    var_proportions /= sum(var_proportions)
+    
+    return transformation_matrix, var_proportions
 
 def PCAplot():
-    tm = principalComponentAnalysis(2)
+    tm, var_proportions = principalComponentAnalysis(2)
     data = getStandardizedData()
     
     projected_data = tm.T.dot(data)
     
-    filtered_data = [[projected_data[x,y] for y in range(len(rows))
-        if abs(projected_data[0,y]) < 6
-        and abs(projected_data[1,y] < 6)] for x in range(2)]
+    filtered_data = [[projected_data[x,y] for y in range(w)
+        if abs(projected_data[0,y]) < 7
+        and abs(projected_data[1,y] < 7)] for x in range(2)]
+    coloring = [rows[y]['quality'] for y in range(w)
+        if abs(projected_data[0,y]) < 7
+        and abs(projected_data[1,y] < 7)]
     
-    plt.scatter(filtered_data[0], filtered_data[1])
+    coloring = [(i-min(coloring))/(max(coloring)-min(coloring)) for i in coloring]
+
+    fig = plt.figure(figsize=(8,8)) # default is (8,6)
+    ax = fig.add_subplot(111, aspect='equal')
+    plt.xlim(-7,5)
+    plt.ylim(-7,7)
+    ax.scatter(filtered_data[0], filtered_data[1], c=plt.cm.jet(coloring))
+    
+    plt.savefig('pca.png', bbox_inches='tight', dpi=300)
+    
+    return var_proportions
+    
 
 def correlationCoefficientsToLaTeX(f):
     f.write("\\section{Correlation coefficients using different functions}\n\n")
@@ -313,7 +330,25 @@ def correlationCoefficientsToLaTeX(f):
         f.write("\\end{tabular}\n")
         f.write("\\end{adjustbox}\n")
     
-
+def PCAtoLaTeX(f):
+    vp = PCAplot()
+    
+    f.write("\\subsection{Principal component analysis}\n")
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{pca.png}\n")
+    f.write("\\caption{2D projection of the normalized data set using PCA}")
+    f.write("\\end{figure}\n\n")
+    
+    f.write("\\begin{adjustbox}{max width=\\textwidth}\n")
+    f.write("\\begin{tabular}{l || *{13}{r}}\n")
+    f.write(" & PC" + (" & PC".join([str(i) for i in range(1,13)])) + "\\\\\n")
+    f.write("\\hline \\\\")
+    f.write("Proportion of variance & " + (" & ".join(["%.4f" % val for val in vp])) + "\\\\\n")
+    f.write("Cumulative variance &" + (" & ".join(["%.4f" % val for val in np.cumsum(vp)])) + "\\\\\n")
+    f.write("\\end{tabular}\n")
+    f.write("\\end{adjustbox}\n")
+    
 def histogramsToLaTeX(key, f):
     if replot:
         drawAttributeHistograms(key)
@@ -329,7 +364,7 @@ def outlierFilteredHistogramsToLaTeX(key, f):
     
     f.write("\\begin{figure}[H]\n")
     f.write("\\includegraphics[width=\\textwidth]{histograms/" + key.replace(" ", "_") + "_filtered.pdf}\n")
-    f.write("\\caption{Histograms of attribute \\emph{" + key + "} with outliers further than 3 standard deviations from the mean filtered}\\n")
+    f.write("\\caption{Histograms of attribute \\emph{" + key + "} with outliers further than 3 standard deviations from the mean filtered}\n")
     f.write("\\end{figure}\n\n")
     
 def boxplotToLaTeX(key, f):
@@ -347,7 +382,7 @@ def scatterMatrixToLaTeX(f):
     
     f.write("\\begin{figure}[H]\n")
     f.write("\\includegraphics[width=\\textwidth]{scattermatrix.png}\n")
-    f.write("\\caption{Scatter matrix of the whole feature set}\\n")
+    f.write("\\caption{Scatter matrix of the whole feature set}\n")
     f.write("\\end{figure}\n\n")
 
 def outlierFilteredScatterMatrixToLaTeX(f):
@@ -356,7 +391,7 @@ def outlierFilteredScatterMatrixToLaTeX(f):
     
     f.write("\\begin{figure}[H]\n")
     f.write("\\includegraphics[width=\\textwidth]{scattermatrix_filtered.png}\n")
-    f.write("\\caption{Scatter matrix of the whole feature set with outliers further than 3 standard deviations from the mean filtered}\\n")
+    f.write("\\caption{Scatter matrix of the whole feature set with outliers further than 3 standard deviations from the mean filtered}\n")
     f.write("\\end{figure}\n\n")
 
 def parallelPlotToLaTeX(f):
@@ -365,7 +400,7 @@ def parallelPlotToLaTeX(f):
     
     f.write("\\begin{figure}[H]\n")
     f.write("\\includegraphics[width=\\textwidth]{parallel_coords.png}\n")
-    f.write("\\caption{Parallel coordinates representation of the data set}\\n")
+    f.write("\\caption{Parallel coordinates representation of the data set}\n")
     f.write("\\end{figure}\n\n")
     
         
@@ -388,6 +423,8 @@ def LaTeXifyProjct():
         scatterMatrixToLaTeX(f)
         outlierFilteredScatterMatrixToLaTeX(f)
         parallelPlotToLaTeX(f)
+        
+        PCAtoLaTeX(f)
         
         correlationCoefficientsToLaTeX(f)
         
