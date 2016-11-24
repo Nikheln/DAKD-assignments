@@ -91,12 +91,12 @@ def drawScatterMatrix(**kwargs):
 
 def drawParallelPlot(key):
     dims = len(keys)
-    fig, axes = plt.subplots(1, dims, sharey=False)
+    fig, axes = plt.subplots(1, dims, figsize=(15,10), sharey=False)
     plt.subplots_adjust(wspace=0)
     
-    # Move the key used for coloring to the last position
-    keylist = [k for k in keys if k != key]
-    keylist.append(key)
+    # Sort the properties based on their correlation with key
+    cc = spearman.calculateCC()
+    keylist = sorted(keys, key=lambda k: cc[k][key])
     
     # Create the list of colors used for lines
     coloring = [r[key] for r in rows]
@@ -107,17 +107,42 @@ def drawParallelPlot(key):
         axis.yaxis.set_ticks_position('none')
         plt.setp(axis.get_yticklabels(), visible=False)
         axis.set_title(keylist[i].replace(" ", "\n"), x=0)
-        if i+1 < dims:
-            rside = [r[keylist[i]] for r in rows]
-            rside = [(i-min(rside))/(max(rside)-min(rside)) for i in rside]
-            lside = [r[keylist[i+1]] for r in rows]
-            lside = [(i-min(lside))/(max(lside)-min(lside)) for i in lside]
-            for i in range(len(rside)):
-                axis.plot([1,0],[lside[i], rside[i]], color=plt.cm.jet(coloring[i]))
+        if i < dims-1:
+            rside,lside = [], []
+            for r in rows:
+                rside.append(r[keylist[i]])
+                lside.append(r[keylist[i+1]])
+                
+            rmean, rstd = np.mean(rside), np.std(rside)
+            lmean, lstd = np.mean(lside), np.std(lside)
+            
+            rside = [(i-rmean)/rstd for i in rside]
+            lside = [(i-lmean)/lstd for i in lside]
+            
+            rside_filtered=[]
+            lside_filtered=[]
+            for k in range(len(rside)):
+                if (abs(rside[k]) < 4 and abs(lside[k]) < 4):
+                    rside_filtered.append(rside[k])
+                    lside_filtered.append(lside[k])
+                     
+            rside = rside_filtered
+            lside = lside_filtered
+            
+            rmin, rmax = min(rside), max(rside)
+            lmin, lmax = min(lside), max(lside)
+            
+            rside = [(i-rmin)/(rmax-rmin) for i in rside]
+            lside = [(i-lmin)/(lmax-lmin) for i in lside]
+                 
+            for j in range(len(rside)):
+                axis.plot([1,0],[lside[j], rside[j]], color=plt.cm.jet(coloring[j]))
+                    
         else:
-            # Requires testing!
-            for s in axis.spines:
-                s.set_visible(False)
+            axis.spines['top'].set_visible(False)
+            axis.spines['bottom'].set_visible(False)
+            axis.spines['right'].set_visible(False)
+            
     plt.savefig('parallel_coords.png', bbox_inches='tight', dpi=300)
     plt.clf()
     
@@ -140,7 +165,9 @@ def drawAttributeBoxplot(key):
     plt.boxplot(data, vert=False,flierprops={'marker':'o', 'markerfacecolor':'none', 'markersize':'2', 'linewidth':'0.5'})
     plt.savefig('boxplots/' + key.replace(" ", "_") + ".pdf", bbox_inches='tight')
 
-##### Functionalities for drawing histograms #####
+#==============================================================================
+# Functionalities for drawing histograms
+#==============================================================================
 class BinAmountFormula(object):
     def __init__(self, name, code):
         self.name = name
@@ -204,32 +231,10 @@ def drawAttributeHistograms(key, **kwargs):
     else:
         plt.savefig('histograms/' + key.replace(" ", "_") + '.pdf')
 
-##### Functionalities for correlation coefficient calculations #####
-class CCFormula(object):
-    def __init__(self, name):
-        self.name = name
-    
-    def calculateCC():
-        raise NotImplementedError("Not implemented!")
 
-pearson = CCFormula('Pearson\'s correlation coefficient')
-def pearsonCC():
-    return {k1:{k2:stats.pearsonr([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
-pearson.calculateCC = pearsonCC
-
-spearman = CCFormula('Spearman\'s rho')
-def spearmanCC():
-    return {k1:{k2:stats.spearmanr([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
-spearman.calculateCC = spearmanCC
-
-kendall = CCFormula('Kendall\'s tau')
-def kendallCC():
-    return {k1:{k2:stats.kendalltau([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
-kendall.calculateCC = kendallCC
-    
-correlationCoefficientFunctions = [pearson, spearman, kendall]
-
-##### Principal component analysis #####
+#==============================================================================
+# Principal component analysis
+#==============================================================================
 w=len(rows)
 h=len(keys)
 
@@ -248,10 +253,23 @@ def getStandardizedData():
             X[i,j] = (X[i,j]-mean_vector[i])/std_vector[i]
     
     return X
+
+def getStandardizedTestData():
+    X = np.matrix([[r[k] for r in rows[0:100]] for k in keys])
+    mean_vector = np.array([np.mean(X[i,:]) for i in range(h)]).reshape(h,1)
+    std_vector = np.array([np.std(X[i,:]) for i in range(h)]).reshape(h,1)
+    print(X.shape)
+    # Z-score standardization
+    for i in range(h):
+        for j in range(X.shape[1]):
+            X[i,j] = (X[i,j]-mean_vector[i])/std_vector[i]
     
-def principalComponentAnalysis(dimensions):
+    return X
     
-    X = getStandardizedData()
+def principalComponentAnalysis(X, dimensions):
+    h = X.shape[1]
+    w = X.shape[0]
+    
     mean_vector = [np.mean(X[:,i]) for i in range(h)]
     
     cov_matrix = np.zeros((h, h))
@@ -298,7 +316,63 @@ def PCAplot():
     
     return var_proportions
     
+#==============================================================================
+# Multidimensional scaling
+#==============================================================================
+def getDistanceMatrix(data):
+    def dist(v1, v2):
+        return math.sqrt(sum([(v1[i] - v2[i])**2 for i in range(len(v1))]))
+    
+    dm = np.zeros((data.shape[1], data.shape[1]))
+    for i in range(data.shape[1]):
+        for j in range(data.shape[1]):
+            dm[i,j] = dist(data[:,i].flat, data[:,j].flat)
+    return dm
+    
+def MDS(dimension, step):
+    data = getStandardizedTestData()
+    distX_m = getDistanceMatrix(data)
+    tran_m = principalComponentAnalysis(data, dimension)
+    Y = tran_m.T.dot(data)
+    
+    for i in range(10):
+        # Compute distance matrix in projection
+        distY_m = getDistanceMatrix(Y)
+        # Compute derivatives in all points
+        
+        # Move all points in Y by step away from derivative
 
+
+#==============================================================================
+# Functionalities for correlation coefficient calculations
+#==============================================================================
+class CCFormula(object):
+    def __init__(self, name):
+        self.name = name
+    
+    def calculateCC():
+        raise NotImplementedError("Not implemented!")
+
+pearson = CCFormula('Pearson\'s correlation coefficient')
+def pearsonCC():
+    return {k1:{k2:stats.pearsonr([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
+pearson.calculateCC = pearsonCC
+
+spearman = CCFormula('Spearman\'s rho')
+def spearmanCC():
+    return {k1:{k2:stats.spearmanr([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
+spearman.calculateCC = spearmanCC
+
+kendall = CCFormula('Kendall\'s tau')
+def kendallCC():
+    return {k1:{k2:stats.kendalltau([r[k1] for r in rows], [r[k2] for r in rows])[0] for k2 in keys} for k1 in keys}
+kendall.calculateCC = kendallCC
+    
+correlationCoefficientFunctions = [pearson, spearman, kendall]
+
+#==============================================================================
+# Correlation coefficients
+#==============================================================================
 def correlationCoefficientsToLaTeX(f):
     f.write("\\section{Correlation coefficients using different functions}\n\n")
     
