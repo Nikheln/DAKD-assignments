@@ -9,9 +9,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+import scipy as sc
 import scipy.stats as stats
 import subprocess
 import os
+import time
 
 rows = []
 keys = []
@@ -174,12 +176,17 @@ def drawBoxPlots():
 
 def drawAttributeBoxplot(key):
     data = [r[key] for r in rows]
-    plt.clf()
-    plt.boxplot(data, vert=False,
+    fig = plt.figure(1, figsize=(10,1))
+    ax = fig.add_subplot(111)
+    bp = ax.boxplot(data, vert=False,
                 flierprops={'marker':'o', 'markerfacecolor':'none',
                             'markersize':'2', 'linewidth':'0.5'})
+    ax.set_yticklabels([])
+    ax.get_yaxis().set_ticks([])
+    
     plt.savefig('boxplots/' + key.replace(" ", "_") + ".pdf",
-                bbox_inches='tight')
+               bbox_inches='tight')
+    plt.clf()
 
 #==============================================================================
 # Functionalities for drawing histograms
@@ -274,7 +281,7 @@ def getStandardizedData():
     return X
 
 def getStandardizedTestData():
-    X = np.matrix([[r[k] for r in rows[0:100]] for k in keys])
+    X = np.matrix([[r[k] for r in rows[0:500]] for k in keys])
     mean_vector = np.array([np.mean(X[i,:]) for i in range(h)]).reshape(h,1)
     std_vector = np.array([np.std(X[i,:]) for i in range(h)]).reshape(h,1)
 
@@ -312,14 +319,11 @@ def principalComponentAnalysis(X, dimensions):
     return transformation_matrix, var_proportions
 
 def PCAplot():
-    tm, var_proportions = principalComponentAnalysis(2)
     data = getStandardizedData()
+    tm, var_proportions = principalComponentAnalysis(data, 2)
 
     projected_data = tm.T.dot(data)
 
-    filtered_data = [[projected_data[x,y] for y in range(w)
-        if abs(projected_data[0,y]) < 7
-        and abs(projected_data[1,y] < 7)] for x in range(2)]
     coloring = [rows[y]['quality'] for y in range(w)
         if abs(projected_data[0,y]) < 7
         and abs(projected_data[1,y] < 7)]
@@ -327,11 +331,11 @@ def PCAplot():
     coloring = [(i-min(coloring))/(max(coloring)-min(coloring))
         for i in coloring]
 
-    fig = plt.figure(figsize=(8,8)) # default is (8,6)
+    fig = plt.figure(figsize=(12,12)) # default is (8,6)
     ax = fig.add_subplot(111, aspect='equal')
-    plt.xlim(-7,5)
-    plt.ylim(-7,7)
-    ax.scatter(filtered_data[0], filtered_data[1], c=plt.cm.jet(coloring))
+    plt.xlim(-5,6)
+    plt.ylim(-5,5)
+    ax.scatter(projected_data[0], projected_data[1], c=plt.cm.jet(coloring))
 
     plt.savefig('pca.png', bbox_inches='tight', dpi=300)
 
@@ -340,7 +344,8 @@ def PCAplot():
 #==============================================================================
 # Multidimensional scaling
 #==============================================================================
-def getDistanceMatrix(data):
+
+def getDistanceMatrix_old(data):
     def dist(v1, v2):
         return math.sqrt(sum([(v1[i] - v2[i])**2 for i in range(len(v1))]))
 
@@ -350,22 +355,81 @@ def getDistanceMatrix(data):
             dm[i,j] = dist(data[:,i].flat, data[:,j].flat)
     return dm
 
-def MDS(dimension, step):
-    data = getStandardizedTestData()
+from numpy.matlib import repmat, repeat
+def getDistanceMatrix(points):
+    points = points.T.tolist()
+    numPoints = len(points)
+    distMat = sc.sqrt(np.sum((repmat(points, numPoints, 1) - repeat(points, numPoints, axis=0))**2, axis=1))
+    return distMat.reshape((numPoints,numPoints))
+
+def MDS(dimension, step, iterations, oldMode=False):
+    data = getStandardizedData()
+    print("Data get!")
     n = data.shape[1]
     distX_m = getDistanceMatrix(data)
-    tran_m = principalComponentAnalysis(data, dimension)[0]
-    Y = tran_m.T.dot(data)
+    print("Distance matrix get!")
     
+    tran_m = principalComponentAnalysis(data, dimension)[0]
+    print("PCA done!")
+    
+    comp_Y = tran_m.T.dot(data).T
+    Y = comp_Y.copy()    
     normalization_factor = 2.0/sum([sum([distX_m[i,j]**2 for j in range(i+1,n)]) for i in range(n)])
-    for i in range(10):
+    
+    def getMean(lst):
+        return np.mean([math.sqrt(vec.flat[0]**2+vec.flat[1]**2) for vec in lst])
+    def unnan(input):
+        if math.isnan(input):
+            return 0
+        return input
+    last_mean = 0
+    print("Starting iteration...")
+    for i in range(iterations):
+        time1 = time.clock()
         # Compute distance matrix in projection
-        distY_m = getDistanceMatrix(Y)
+        distY_m = getDistanceMatrix(Y.T)
         # Compute derivatives in all points
+        if oldMode:
+            derivatives = []
+            for k, vec in enumerate(Y):
+                difsum = 0
+                for j, vec2 in enumerate(Y):
+                    if not (j == k or distY_m[k,j] == 0):
+                        difsum += (distY_m[k,j] - distX_m[k,j]) * (vec-vec2)/distY_m[k,j]
+                derivative = normalization_factor * difsum
+                derivatives.append(derivative)
+        else:    
+            dist_sub = 1 - np.divide(distX_m, distY_m)
+            derivatives = np.array([normalization_factor *
+                                    sum([unnan(dist_sub[k,j]) * (vec-vec2).A1
+                                    for j,vec2 in enumerate(Y)])
+                                    for k,vec in enumerate(Y)])
+    
         
         # Move all points in Y by step away from derivative
+        if oldMode:
+            for k, vec in enumerate(Y):
+                Y[k] = vec - derivatives[k]*step
+        else:
+            Y = Y - derivatives*step
+            
+        curr_mean = getMean(Y-comp_Y)
+        print(curr_mean-last_mean)
+        last_mean = curr_mean
+        print("Iteration " + str(i) + " done in time: " + str(time.clock()-time1))
+    
+    coloring = [rows[y]['quality'] for y in range(w)]
 
-
+    coloring = [(i-min(coloring))/(max(coloring)-min(coloring))
+        for i in coloring]
+        
+    fig = plt.figure(figsize=(12,12))
+    ax1 = fig.add_subplot(111, aspect='equal')
+    plt.xlim(-5,6)
+    plt.ylim(-5,5)
+    ax1.scatter(Y.T[0].flat, Y.T[1].flat, c=plt.cm.jet(coloring))
+    
+    plt.savefig('mds.png', bbox_inches='tight', dpi=300)
 #==============================================================================
 # Functionalities for correlation coefficient calculations
 #==============================================================================
@@ -406,8 +470,6 @@ correlationCoefficientFunctions = [pearson, spearman, kendall]
 # Correlation coefficients
 #==============================================================================
 def correlationCoefficientsToLaTeX(f):
-    f.write("\\section{Correlation coefficients using different functions}\n\n")
-
     for function in correlationCoefficientFunctions:
 
         ccs = function.calculateCC()
@@ -440,13 +502,6 @@ def correlationCoefficientsToLaTeX(f):
 def PCAtoLaTeX(f):
     vp = PCAplot()
 
-    f.write("\\subsection{Principal component analysis}\n")
-
-    f.write("\\begin{figure}[H]\n")
-    f.write("\\includegraphics[width=\\textwidth]{pca.png}\n")
-    f.write("\\caption{2D projection of the normalized data set using PCA}")
-    f.write("\\end{figure}\n\n")
-
     f.write("\\begin{adjustbox}{max width=\\textwidth}\n")
     f.write("\\begin{tabular}{l || *{13}{r}}\n")
     f.write(" & PC" + (" & PC".join([str(i) for i in range(1,13)])) + "\\\\\n")
@@ -458,7 +513,23 @@ def PCAtoLaTeX(f):
         + "\\\\\n")
     f.write("\\end{tabular}\n")
     f.write("\\end{adjustbox}\n")
+    
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\includegraphics[width=\\textwidth]{pca.png}\n")
+    f.write("\\caption{2D projection of the normalized data set using PCA}")
+    f.write("\\end{figure}\n\n")
 
+
+def MDStoLaTeX(f):
+    if replot:
+        MDS(2,10,10)
+
+    f.write("\\begin{figure}[H]\n")
+    f.write("\\vspace{2.8cm}\n")
+    f.write("\\includegraphics[width=\\textwidth]{mds.png}\n")
+    f.write("\\caption{2D projection of the normalized data set using MDS with 25 iterations and objective function $E_1$}\n")
+    f.write("\\end{figure}\n\n")
+    
 def histogramsToLaTeX(key, f):
     if replot:
         drawAttributeHistograms(key)
@@ -526,16 +597,20 @@ def LaTeXifyProjct():
             histogramsToLaTeX(key, f)
             outlierFilteredHistogramsToLaTeX(key, f)
             boxplotToLaTeX(key, f)
-            f.write("\\newpage")
+            f.write("\\newpage\n")
 
 
         f.write("\\section{Plots for the whole feature set}\n\n")
         scatterMatrixToLaTeX(f)
         outlierFilteredScatterMatrixToLaTeX(f)
         parallelPlotToLaTeX(f)
-
+        
+        f.write("\\newpage\n")
+        f.write("\\section{Projections to 2D}\n")
         PCAtoLaTeX(f)
-
+        MDStoLaTeX(f)
+        f.write("\\newpage\n\n")
+        f.write("\\section{Correlation coefficients using different functions}\n\n")
         correlationCoefficientsToLaTeX(f)
 
         f.write("\\end{document}")
