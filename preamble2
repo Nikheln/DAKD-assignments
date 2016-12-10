@@ -1,0 +1,13 @@
+\documentclass{report}
+
+\usepackage[a4paper,margin=0.5in]{geometry}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{adjustbox}
+
+\newcolumntype{P}[1]{>{\raggedleft\arraybackslash}b{#1}}
+\newcommand{\bftab}{\fontseries{b}\selectfont}
+
+\begin{document}

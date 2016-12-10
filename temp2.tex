@@ -1,0 +1,176 @@
+\documentclass{report}
+
+\usepackage[a4paper,margin=0.5in]{geometry}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{adjustbox}
+
+\newcolumntype{P}[1]{>{\raggedleft\arraybackslash}b{#1}}
+\newcommand{\bftab}{\fontseries{b}\selectfont}
+
+\begin{document}
+\section{Leave-one-out cross validations of k-NN}
+
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&2&9&9&0&0&0 \\
+4 & 0&\textbf{6}&85&62&10&0&0 \\
+5 & 0&5&\textbf{600}&784&68&0&0 \\
+6 & 0&0&453&\textbf{1481}&261&3&0 \\
+7 & 0&1&54&523&\textbf{302}&0&0 \\
+8 & 0&0&10&73&75&\textbf{17}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{5-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&11&9&0&0&0 \\
+4 & 0&\textbf{5}&73&80&5&0&0 \\
+5 & 0&2&\textbf{459}&959&37&0&0 \\
+6 & 0&0&335&\textbf{1698}&165&0&0 \\
+7 & 0&0&38&663&\textbf{179}&0&0 \\
+8 & 0&0&5&106&64&\textbf{0}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{10-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&10&10&0&0&0 \\
+4 & 0&\textbf{2}&78&81&2&0&0 \\
+5 & 0&2&\textbf{483}&936&36&0&0 \\
+6 & 0&0&352&\textbf{1680}&166&0&0 \\
+7 & 0&0&45&670&\textbf{165}&0&0 \\
+8 & 0&0&5&125&45&\textbf{0}&0 \\
+9 & 0&0&0&4&1&0&\textbf{0} \\
+\end{tabular}
+\caption{15-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&9&11&0&0&0 \\
+4 & 0&\textbf{0}&73&89&1&0&0 \\
+5 & 0&0&\textbf{395}&1040&22&0&0 \\
+6 & 0&0&287&\textbf{1787}&124&0&0 \\
+7 & 0&0&35&735&\textbf{110}&0&0 \\
+8 & 0&0&4&142&29&\textbf{0}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{20-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&8&12&0&0&0 \\
+4 & 0&\textbf{0}&76&86&1&0&0 \\
+5 & 0&0&\textbf{432}&1001&24&0&0 \\
+6 & 0&0&302&\textbf{1794}&102&0&0 \\
+7 & 0&0&47&723&\textbf{110}&0&0 \\
+8 & 0&0&4&140&31&\textbf{0}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{25-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&8&12&0&0&0 \\
+4 & 0&\textbf{0}&63&99&1&0&0 \\
+5 & 0&0&\textbf{355}&1087&15&0&0 \\
+6 & 0&0&269&\textbf{1848}&81&0&0 \\
+7 & 0&0&32&758&\textbf{90}&0&0 \\
+8 & 0&0&4&150&21&\textbf{0}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{30-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&8&12&0&0&0 \\
+4 & 0&\textbf{0}&62&100&1&0&0 \\
+5 & 0&0&\textbf{357}&1086&14&0&0 \\
+6 & 0&0&276&\textbf{1844}&78&0&0 \\
+7 & 0&0&35&774&\textbf{71}&0&0 \\
+8 & 0&0&0&157&18&\textbf{0}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{35-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&9&11&0&0&0 \\
+4 & 0&\textbf{0}&60&102&1&0&0 \\
+5 & 0&0&\textbf{319}&1129&9&0&0 \\
+6 & 0&0&221&\textbf{1910}&67&0&0 \\
+7 & 0&0&30&800&\textbf{50}&0&0 \\
+8 & 0&0&0&157&18&\textbf{0}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{40-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&8&12&0&0&0 \\
+4 & 0&\textbf{0}&65&97&1&0&0 \\
+5 & 0&0&\textbf{330}&1117&10&0&0 \\
+6 & 0&0&240&\textbf{1896}&62&0&0 \\
+7 & 0&0&35&787&\textbf{58}&0&0 \\
+8 & 0&0&4&157&14&\textbf{0}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{45-NN cross validation}
+\end{table}
+\begin{table}
+\centering
+\begin{tabular}{r | *{7}{c}}
+& \multicolumn{7}{c}{Predicted class} \\
+True class & 3&4&5&6&7&8&9 \\
+\hline
+3 & \textbf{0}&0&8&12&0&0&0 \\
+4 & 0&\textbf{0}&62&100&1&0&0 \\
+5 & 0&0&\textbf{298}&1151&8&0&0 \\
+6 & 0&0&222&\textbf{1930}&46&0&0 \\
+7 & 0&0&29&808&\textbf{43}&0&0 \\
+8 & 0&0&3&163&9&\textbf{0}&0 \\
+9 & 0&0&0&5&0&0&\textbf{0} \\
+\end{tabular}
+\caption{50-NN cross validation}
+\end{table}
+\end{document}
