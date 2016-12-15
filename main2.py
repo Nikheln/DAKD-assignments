@@ -108,11 +108,22 @@ def nFoldCV_KNN(n, k):
             real = int(test[qIndex])
             results[real-qMin][int(round(estimate))-qMin] += 1
             results2[str(real)].append(round(estimate,2))
-        
+    # results:matrix with real-approximation counts
+    # results2:object with lists for each real quality with approximated values
     return results, results2
     
 def leaveOneOut_KNN(k):
     return nFoldCV_KNN(len(mtx), k)
+    
+def findOptimalK(lower,upper):
+    results = {}
+    for i in range(lower, upper+1):
+       results[i] = leaveOneOut_KNN(i)[]
+    print("Tasks submitted!")
+    errors = {}
+    for i in range(lower, upper+1):
+        errors[str(i)] = sum([results[0][i+lower][j][j] for j in range(qMax-qMin+1)])/len(rows)
+    return errors
     
 def dataToHeatmap(data):
     plt.imshow(data, cmap='hot', interpolation='nearest')
