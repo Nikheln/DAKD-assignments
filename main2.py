@@ -142,6 +142,51 @@ def dataToScatter(data, k_used):
     ax.scatter(keys, values, color='none', edgecolors='black', linewidth=0.2, s=0.5)
     fig.savefig('cv_scatters/' + str(k_used) + '.png', bbox_inches='tight', dpi=300)
     
+    
+#==============================================================================
+# Regression
+#==============================================================================
+def rls(_X, _y, regparam):
+    X = np.matrix(_X)
+    y = np.matrix(_y).T
+    d = X.shape[1]
+    l = np.eye(d)
+    A = np.dot(X.T, X) + regparam * l
+    b = np.dot(X.T, y)
+    w = np.linalg.solve(A, b)
+    return w
+
+def getRegressionEstimate(vec, w):
+    return np.dot(vec, w)
+    
+def nFoldCV_reg(n, regparam):
+    l = len(mtx)
+    shf = random.sample(mtx, l)
+    means = [np.mean(row) for row in np.matrix(shf).T]
+    stds = [np.std(row) for row in np.matrix(shf).T]
+    shf = [[(shf[i][j] - means[j])/stds[j] for j in range(len(keys))] for i in range(len(mtx))]
+    qRange = qMax - qMin
+    results = [[0 for col in range(qRange+1)] for row in range(qRange+1)]
+    results2 = {}
+    for i in range(10):
+        results2[str(i+1)] = []
+    for i in range(n):
+        low = int((i/n)*l)
+        high = int(((i+1)/n)*l)
+        testSet = shf[low:high]
+        trainSet = shf[:low] + shf[high:]
+        w = rls([row[:-1] for row in trainSet], [row[-1] for row in trainSet], regparam)
+        
+        for test in testSet:
+            estimate = getRegressionEstimate(test[:qIndex], w)[0,0]*stds[qIndex]+means[qIndex]
+            real = int(test[qIndex]*stds[qIndex] + means[qIndex])
+            results[real-qMin][int(round(estimate))-qMin] += 1
+            results2[str(real)].append(round(estimate,2))
+        
+    return results, results2
+
+def leaveOneOut_reg(regparam):
+    return nFoldCV_reg(len(mtx), regparam)
 #==============================================================================
 # Project LaTeXifying
 #==============================================================================
