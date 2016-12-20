@@ -1,4 +1,4 @@
-\documentclass{report}
+\documentclass[notitlepage]{report}
 
 \usepackage[a4paper,margin=0.5in]{geometry}
 \usepackage{array}
@@ -7,170 +7,68 @@
 \usepackage{float}
 \usepackage{adjustbox}
 
-\newcolumntype{P}[1]{>{\raggedleft\arraybackslash}b{#1}}
-\newcommand{\bftab}{\fontseries{b}\selectfont}
+\author{Niko Hellgren, 505174}
+\title{Data Analysis and Knowledge Discovery, Assignment 2}
+\linespread{1.14}
+\renewcommand{\thesection}{\arabic{section}}
 
 \begin{document}
-\section{Leave-one-out cross validations of k-NN}
+\maketitle
 
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&2&9&9&0&0&0 \\
-4 & 0&\textbf{6}&85&62&10&0&0 \\
-5 & 0&5&\textbf{600}&784&68&0&0 \\
-6 & 0&0&453&\textbf{1481}&261&3&0 \\
-7 & 0&1&54&523&\textbf{302}&0&0 \\
-8 & 0&0&10&73&75&\textbf{17}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{5-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&11&9&0&0&0 \\
-4 & 0&\textbf{5}&73&80&5&0&0 \\
-5 & 0&2&\textbf{459}&959&37&0&0 \\
-6 & 0&0&335&\textbf{1698}&165&0&0 \\
-7 & 0&0&38&663&\textbf{179}&0&0 \\
-8 & 0&0&5&106&64&\textbf{0}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{10-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&10&10&0&0&0 \\
-4 & 0&\textbf{2}&78&81&2&0&0 \\
-5 & 0&2&\textbf{483}&936&36&0&0 \\
-6 & 0&0&352&\textbf{1680}&166&0&0 \\
-7 & 0&0&45&670&\textbf{165}&0&0 \\
-8 & 0&0&5&125&45&\textbf{0}&0 \\
-9 & 0&0&0&4&1&0&\textbf{0} \\
-\end{tabular}
-\caption{15-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&9&11&0&0&0 \\
-4 & 0&\textbf{0}&73&89&1&0&0 \\
-5 & 0&0&\textbf{395}&1040&22&0&0 \\
-6 & 0&0&287&\textbf{1787}&124&0&0 \\
-7 & 0&0&35&735&\textbf{110}&0&0 \\
-8 & 0&0&4&142&29&\textbf{0}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{20-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&8&12&0&0&0 \\
-4 & 0&\textbf{0}&76&86&1&0&0 \\
-5 & 0&0&\textbf{432}&1001&24&0&0 \\
-6 & 0&0&302&\textbf{1794}&102&0&0 \\
-7 & 0&0&47&723&\textbf{110}&0&0 \\
-8 & 0&0&4&140&31&\textbf{0}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{25-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&8&12&0&0&0 \\
-4 & 0&\textbf{0}&63&99&1&0&0 \\
-5 & 0&0&\textbf{355}&1087&15&0&0 \\
-6 & 0&0&269&\textbf{1848}&81&0&0 \\
-7 & 0&0&32&758&\textbf{90}&0&0 \\
-8 & 0&0&4&150&21&\textbf{0}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{30-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&8&12&0&0&0 \\
-4 & 0&\textbf{0}&62&100&1&0&0 \\
-5 & 0&0&\textbf{357}&1086&14&0&0 \\
-6 & 0&0&276&\textbf{1844}&78&0&0 \\
-7 & 0&0&35&774&\textbf{71}&0&0 \\
-8 & 0&0&0&157&18&\textbf{0}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{35-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&9&11&0&0&0 \\
-4 & 0&\textbf{0}&60&102&1&0&0 \\
-5 & 0&0&\textbf{319}&1129&9&0&0 \\
-6 & 0&0&221&\textbf{1910}&67&0&0 \\
-7 & 0&0&30&800&\textbf{50}&0&0 \\
-8 & 0&0&0&157&18&\textbf{0}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{40-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&8&12&0&0&0 \\
-4 & 0&\textbf{0}&65&97&1&0&0 \\
-5 & 0&0&\textbf{330}&1117&10&0&0 \\
-6 & 0&0&240&\textbf{1896}&62&0&0 \\
-7 & 0&0&35&787&\textbf{58}&0&0 \\
-8 & 0&0&4&157&14&\textbf{0}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{45-NN cross validation}
-\end{table}
-\begin{table}
-\centering
-\begin{tabular}{r | *{7}{c}}
-& \multicolumn{7}{c}{Predicted class} \\
-True class & 3&4&5&6&7&8&9 \\
-\hline
-3 & \textbf{0}&0&8&12&0&0&0 \\
-4 & 0&\textbf{0}&62&100&1&0&0 \\
-5 & 0&0&\textbf{298}&1151&8&0&0 \\
-6 & 0&0&222&\textbf{1930}&46&0&0 \\
-7 & 0&0&29&808&\textbf{43}&0&0 \\
-8 & 0&0&3&163&9&\textbf{0}&0 \\
-9 & 0&0&0&5&0&0&\textbf{0} \\
-\end{tabular}
-\caption{50-NN cross validation}
-\end{table}
+\section{\textit{k}-NN prediction}
+The model used was programmed in Python with little to no use of external libraries. The data was z-score standardized, pre-calculated into a sample distance matrix, which was then used to leave-one-out cross-validate the data. The CV-data was used to tune the value of $k$ to minimize the mean-square error (MSE) in the data. Since the classification is into discrete categories, the distance from the data point to the range that rounds to the correct value was considered in the calculation.
+
+The results of the tuning process of $k$ is presented in Figure \ref{tbl:nn-mses}. Based on the results, the value $k=12$ gives the lowest error, albeit with little margin to the other low values. The cross-validation results of 12-NN are presented in Figures \ref{tbl:nn-scatter} and \ref{tbl:nn-conf}.
+
+Despite the relatively low value of MSE, the results are not too good. The uneven distribution of samples in different qualities causes most samples to be predicted to be of quality 6, which makes up 44.9\% of the whole data set, with the range 5--7 making up 77.9\%. The low correlation between the features and the quality (as was seen in assignment 1) causes the evenly distributed 6-samples in the train set to pull most test samples to that class.
+
+\begin{figure}[H]
+\includegraphics[width=\textwidth]{mse2_k1-50.png}
+\caption{Errors of $k$-NN cross-validation}
+\label{tbl:nn-mses}
+\end{figure}
+
+\begin{figure}
+\includegraphics[width=\textwidth]{cv_scatters/12.png}
+\caption{Results of 12-NN cross-validation as a scatter plot. The green boxes represent areas where the prediction is correct. All points have jitter following N(0,0.05) to avoid overlapping.}
+\label{tbl:nn-scatter}
+\end{figure}
+
+\begin{figure}
+\includegraphics[width=\textwidth]{12-nn-cv.png}
+\caption{Confusion matrix of 12-NN cross-validation}
+\label{tbl:nn-conf}
+\end{figure}
+\newpage
+\section{Linear regression}
+Regression model was built using the examples presented in the lectures for Ridge regression. The same standardized data was used and leave-one-out cross-validated to determine a good value for the hyperparameter $\lambda$.
+
+The results of the tuning process of $\lambda$ are presented in Figures \ref{tbl:reg-mses-15} and \ref{tbl:reg-mses}. Due to the random ordering of the samples, the values of $\lambda$ with the smallest error varied between runs, but was often the smallest with values around 40. The cross-validation results of Ridge regression with $\lambda=40$ are presented in Figures \ref{tbl:reg-scatter} and \ref{tbl:reg-conf}.
+
+The MSE values are larger than with k-NN, and it can be seen as worse predictions. The samples in class 6 were very well predicted, but this is partially caused by the model predicting most of the test samples as quality 6.
+
+\begin{figure}[H]
+\includegraphics[width=\textwidth]{mse_lmbd15.png}
+\caption{Errors of Ridge regression cross-validation}
+\label{tbl:reg-mses-15}
+\end{figure}
+
+\begin{figure}[H]
+\includegraphics[width=\textwidth]{mse_lmbd.png}
+\caption{Errors of Ridge regression cross-validation in a smaller range}
+\label{tbl:reg-mses}
+\end{figure}
+
+\begin{figure}
+\includegraphics[width=\textwidth]{cv_scatters/reg_40.png}
+\caption{Results of Ridge regression with $\lambda=40$}
+\label{tbl:reg-scatter}
+\end{figure}
+
+\begin{figure}
+\includegraphics[width=\textwidth]{40-reg-heatmap.png}
+\caption{Confusion matrix of Ridge regression cross-validation}
+\label{tbl:reg-conf}
+\end{figure}
+
 \end{document}

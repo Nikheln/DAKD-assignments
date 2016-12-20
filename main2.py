@@ -48,100 +48,135 @@ def init():
     }
     plt.rcParams.update(params)
 
-def toMatrix(rows):
-    return [[each[var] for var in each] for each in rows]
+def loadMatrix():
+    mtx = [[row[key] for key in keys] for row in rows]
+    stds = [np.std([row[i] for row in mtx]) for i in range(len(keys))]
+    means = [np.mean([row[i] for row in mtx]) for i in range(len(keys))]
+    mtx = [[(mtx[i][j]-means[j])/stds[j] for j in range(len(keys))] for i in range(len(rows))]
+    
+    return mtx, stds, means
     
 init()
-mtx = toMatrix(rows)
+mtx, stds, means = loadMatrix()
+loadMatrix()
 qIndex = keys.index('quality')
 
-def dist(v1,v2):
+def unZQuality(quality):
+    return quality*stds[qIndex]+means[qIndex]
+
+def getVectorWithoutQuality(index):
+    return mtx[index][:qIndex]+mtx[index][qIndex+1:]
+    
+def dist(index1,index2):
     # Do not use the quality value for distance measurement
-    return np.linalg.norm(np.array(v1[:qIndex]+v1[qIndex+1:])-np.array(v2[:qIndex]+v2[qIndex+1:]))
+    return np.linalg.norm(np.array(getVectorWithoutQuality(index1))-np.array(getVectorWithoutQuality(index2)))
     
 def getEstimate(inpt, neighbors):
     ### An ordinary average over the selected neighbours
     return np.average([n[qIndex] for n in neighbors])
 
-def getKNeighbors(k, inpt, trainSet):
-    return sorted(trainSet, key=lambda row: dist(inpt, row))[:k]
+distMatrix = None
+def buildDistMatrix():
+    global distMatrix
+    distMatrix = [[dist(i,j) if j > i else 0 for j in range(len(rows))] for i in range(len(rows))]
+    for i in range(len(mtx)):
+        for j in range(i):
+            distMatrix[i][j] = distMatrix[j][i]
     
-def getDatasets(ratio):
-    trainSet, testSet = [], []
-    
-    for i, row in enumerate(mtx):
-        if random.uniform(0.0,1.0) < ratio:
-            testSet.append(row)
-        else:
-            trainSet.append(row)
-            
-    return trainSet, testSet
-        
-def testKNN(k, ratio):
-    trainSet, testSet = getDatasets(ratio)
-    correct = 0
-    total = len(testSet)
-    
-    for testRow in testSet:
-        estimate = round(getEstimate(testRow, getKNeighbors(k, testRow, trainSet)))
-        if math.isclose(testRow[qIndex], estimate):
-            correct += 1
-    return correct/total
+def getKNeighborIndices(k, inptIndex, trainIndexSet):
+    if distMatrix == None:
+        return sorted(trainIndexSet, key=lambda row: dist(inptIndex, row))[:k]
+    return sorted(trainIndexSet, key = lambda row: distMatrix[inptIndex][row])[:k]
 
-qMin = int(min([row[qIndex] for row in mtx]))
-qMax = int(max([row[qIndex] for row in mtx]))
+qMin = 3
+qMax = 9
+qRange = qMax - qMin
 def nFoldCV_KNN(n, k):
-    l = len(mtx)
-    shf = random.sample(mtx, l)
-    qRange = qMax - qMin
+    l = len(rows)
+    shf = random.sample(range(l), l)
     results = [[0 for col in range(qRange+1)] for row in range(qRange+1)]
     results2 = {}
-    for i in range(10):
-        results2[str(i+1)] = []
+    for i in range(qMin,qMax+1):
+        results2[i] = []
     for i in range(n):
         low = int((i/n)*l)
         high = int(((i+1)/n)*l)
-        testSet = shf[low:high]
-        trainSet = shf[:low] + shf[high:]
-        for test in testSet:
-            estimate = getEstimate(test, getKNeighbors(k, test, trainSet))
-            real = int(test[qIndex])
-            results[real-qMin][int(round(estimate))-qMin] += 1
-            results2[str(real)].append(round(estimate,2))
+        testIndexSet = shf[low:high]
+        trainIndexSet = shf[:low] + shf[high:]
+        for testIndex in testIndexSet:
+            kni = getKNeighborIndices(k, testIndex, trainIndexSet)
+            kns = [mtx[i] for i in kni]
+            estimate = unZQuality(getEstimate(mtx[testIndex], kns))
+            real = unZQuality(mtx[testIndex][qIndex])
+            results[int(round(real-qMin))][int(round(estimate-qMin))] += 1
+            results2[int(round(real))].append(round(estimate,2))
     # results:matrix with real-approximation counts
     # results2:object with lists for each real quality with approximated values
     return results, results2
     
 def leaveOneOut_KNN(k):
-    return nFoldCV_KNN(len(mtx), k)
+    return nFoldCV_KNN(len(rows), k)
     
-def findOptimalK(lower,upper):
-    results = {}
-    for i in range(lower, upper+1):
-       results[i] = leaveOneOut_KNN(i)[]
-    print("Tasks submitted!")
+def getMSEs_KNN(lower,upper):
     errors = {}
     for i in range(lower, upper+1):
-        errors[str(i)] = sum([results[0][i+lower][j][j] for j in range(qMax-qMin+1)])/len(rows)
+        res = leaveOneOut_KNN(i)[1]
+        sm = 0
+        for key in res.keys():
+            for j in res[key]:
+                diff = float(key)-float(j)
+                if diff < -0.5:
+                    sm = sm + (diff+0.5)**2
+                elif diff >= 0.5:
+                    sm = sm + (diff-0.5)**2
+        errors[i] = sm/len(rows)
     return errors
     
 def dataToHeatmap(data):
-    plt.imshow(data, cmap='hot', interpolation='nearest')
+    plt.pyplot.imshow(data, cmap=plt.pyplot.cm.jet, interpolation='nearest')
     plt.show()
     
 def dataToScatter(data, k_used):
     keys, values = [],[]
     for key in data:
         for value in data[key]:
-            keys.append(int(key)+np.random.normal(0,0.1))
-            values.append(value+np.random.normal(0,0.1))
+            keys.append(int(key)+np.random.normal(0,0.05))
+            values.append(value+np.random.normal(0,0.05))
     fig = plt.pyplot.figure()
     ax = fig.add_subplot(111)
     for i in range(2,9):
         ax.add_patch(plt.patches.Rectangle((i+0.5,i+0.5), 1, 1, alpha=0.3, facecolor="#80FF00", edgecolor="none"))
     ax.scatter(keys, values, color='none', edgecolors='black', linewidth=0.2, s=0.5)
+    ax.set_title('Cross-validation results with $k='+str(k_used)+'$')
+    ax.set_xlabel('Real quality')
+    ax.set_ylabel('Approximated quality using '+str(k_used)+'-NN')
     fig.savefig('cv_scatters/' + str(k_used) + '.png', bbox_inches='tight', dpi=300)
     
+def cvResultsToPlot(lower, upper):
+    errors = getMSEs_KNN(lower, upper)
+    plt.pyplot.title('Cross-validation error with values of $k$ in range '+str(lower)+'--'+str(upper))
+    plt.pyplot.xlabel('$k$ used')
+    plt.pyplot.ylabel('Mean-square error')
+    plt.pyplot.plot([key for key in errors],[errors[key] for key in errors])
+    minkey = min(errors,key=errors.get)
+    plt.pyplot.xticks(list(plt.pyplot.xticks()[0])+[minkey])
+    plt.pyplot.savefig('mse_k'+str(lower)+'-'+str(upper)+'.png',dpi=300,bbox_inches='tight')
+    
+def cvResultsToHeatmap(k):
+    data = leaveOneOut_KNN(k)[0]
+    data2 = [list(x) for x in zip(*[[val/sum(row) for val in row] for row in data])]
+    heatmap=plt.pyplot.pcolor([p+0.5 for p in range(2,10)], [p+0.5 for p in range(2,10)], data2, cmap=plt.pyplot.cm.Blues, vmin=0, vmax=1.0)
+    for i in range(len(data)):
+        for j in range(len(data[i])):
+            plt.pyplot.text(i+3, j+3, data[i][j], horizontalalignment='center', verticalalignment='center', color='black')
+    cbar = plt.pyplot.colorbar(heatmap)
+    cbar.ax.set_ylabel('\% of all predictions in current real quality')
+    heatmap.axes.set_xlim(2.5,9.5)
+    heatmap.axes.set_ylim(2.5,9.5)
+    heatmap.axes.set_xlabel('Real quality')
+    heatmap.axes.set_ylabel('Predicted quality')
+    plt.pyplot.title('Leave-one-out cross-validation results of 12-NN')
+    plt.pyplot.savefig(str(k)+'-nn-heatmap.png', dpi=300, bbox_inches='tight')
     
 #==============================================================================
 # Regression
@@ -157,36 +192,97 @@ def rls(_X, _y, regparam):
     return w
 
 def getRegressionEstimate(vec, w):
-    return np.dot(vec, w)
+    return np.dot(vec, w)[0,0]
     
 def nFoldCV_reg(n, regparam):
     l = len(mtx)
     shf = random.sample(mtx, l)
-    means = [np.mean(row) for row in np.matrix(shf).T]
-    stds = [np.std(row) for row in np.matrix(shf).T]
-    shf = [[(shf[i][j] - means[j])/stds[j] for j in range(len(keys))] for i in range(len(mtx))]
-    qRange = qMax - qMin
+    
     results = [[0 for col in range(qRange+1)] for row in range(qRange+1)]
     results2 = {}
-    for i in range(10):
-        results2[str(i+1)] = []
+    for i in range(qMin,qMax+1):
+        results2[i] = []
     for i in range(n):
         low = int((i/n)*l)
         high = int(((i+1)/n)*l)
         testSet = shf[low:high]
         trainSet = shf[:low] + shf[high:]
-        w = rls([row[:-1] for row in trainSet], [row[-1] for row in trainSet], regparam)
+        w = rls([row[:qIndex]+row[qIndex+1:] for row in trainSet], [row[qIndex] for row in trainSet], regparam)
         
         for test in testSet:
-            estimate = getRegressionEstimate(test[:qIndex], w)[0,0]*stds[qIndex]+means[qIndex]
-            real = int(test[qIndex]*stds[qIndex] + means[qIndex])
-            results[real-qMin][int(round(estimate))-qMin] += 1
-            results2[str(real)].append(round(estimate,2))
+            estimate = unZQuality(getRegressionEstimate(test[:qIndex]+test[qIndex+1:], w))
+            real = unZQuality(test[qIndex])
+            results[int(round(real-qMin))][int(round(estimate-qMin))] += 1
+            results2[int(round(real))].append(round(estimate,2))
         
     return results, results2
 
 def leaveOneOut_reg(regparam):
     return nFoldCV_reg(len(mtx), regparam)
+
+def getConfusionRates(rng):
+    confRates = {}
+    for i in rng:
+        res = nFoldCV_reg(50,i)[0]
+        confRates[i] = 1-sum([res[j][j] for j in range(len(res))])/len(rows)
+    return confRates
+def getMSEs_reg(rng):
+    errors = {}
+    for i in rng:
+        res = nFoldCV_reg(50, i)[1]
+        sm = 0
+        for key in res.keys():
+            for j in res[key]:
+                diff = float(key)-float(j)
+                if diff < -0.5:
+                    sm = sm + (diff+0.5)**2
+                elif diff >= 0.5:
+                    sm = sm + (diff-0.5)**2
+        errors[i] = sm/len(rows)
+    return errors
+    
+def dataToScatter_reg(data, lmbd_used):
+    keys, values = [],[]
+    for key in data:
+        for value in data[key]:
+            keys.append(int(key)+np.random.normal(0,0.05))
+            values.append(value+np.random.normal(0,0.05))
+    fig = plt.pyplot.figure()
+    ax = fig.add_subplot(111)
+    for i in range(2,9):
+        ax.add_patch(plt.patches.Rectangle((i+0.5,i+0.5), 1, 1, alpha=0.3, facecolor="#80FF00", edgecolor="none"))
+    ax.scatter(keys, values, color='none', edgecolors='black', linewidth=0.2, s=0.5)
+    ax.set_title('Cross-validation results with $\\lambda='+str(lmbd_used)+'$')
+    ax.set_xlabel('Real quality')
+    ax.set_ylabel('Approximated quality using Ridge regression')
+    fig.savefig('cv_scatters/reg_' + str(lmbd_used) + '.png', bbox_inches='tight', dpi=300)
+    
+def cvResultsToPlot_reg(rng):
+    errors = getMSEs_reg(rng)
+    plt.pyplot.title('Cross-validation error with values of $\\lambda$ in range '+str(min(rng))+'--'+str(max(rng)))
+    plt.pyplot.xlabel('$\\lambda$ used')
+    plt.pyplot.ylabel('Mean-square error')
+    plt.pyplot.plot(rng,[errors[i] for i in rng])
+    minkey = min(errors,key=errors.get)
+    plt.pyplot.xticks(list(plt.pyplot.xticks()[0])+[minkey])
+    plt.pyplot.savefig('mse_lmbd.png',dpi=300,bbox_inches='tight')
+    
+def cvResultsToHeatmap_reg(lmbd):
+    data = leaveOneOut_reg(lmbd)[0]
+    data2 = [list(x) for x in zip(*[[val/sum(row) for val in row] for row in data])]
+    heatmap=plt.pyplot.pcolor([p+0.5 for p in range(2,10)], [p+0.5 for p in range(2,10)], data2, cmap=plt.pyplot.cm.Blues, vmin=0, vmax=1.0)
+    for i in range(len(data)):
+        for j in range(len(data[i])):
+            plt.pyplot.text(i+3, j+3, data[i][j], horizontalalignment='center', verticalalignment='center', color='black')
+    cbar = plt.pyplot.colorbar(heatmap)
+    cbar.ax.set_ylabel('\% of all predictions in current real quality')
+    heatmap.axes.set_xlim(2.5,9.5)
+    heatmap.axes.set_ylim(2.5,9.5)
+    heatmap.axes.set_xlabel('Real quality')
+    heatmap.axes.set_ylabel('Predicted quality')
+    plt.pyplot.title('Leave-one-out cross-validation results of Ridge regression with $\\lambda='+str(lmbd)+'$')
+    plt.pyplot.savefig(str(lmbd)+'-reg-heatmap.png', dpi=300, bbox_inches='tight')
+    
 #==============================================================================
 # Project LaTeXifying
 #==============================================================================
